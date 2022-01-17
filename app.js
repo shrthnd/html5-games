@@ -14,6 +14,18 @@ const player = {
   position: Vector(10, 10),
   velocity: Vector(0,0),
   body: [],
+  collisions: () => {
+    // check collision with self 
+    for (let i = world.player.body.length - 1; i > 0; i--) {
+      if (
+        world.player.position.x == world.player.body[i].x &&
+        world.player.position.y == world.player.body[i].y
+      ) {
+        world.playing = false; 
+        canvas.style.backgroundColor = 'red'; 
+      }
+    }
+  },
   draw: (world) => {
     // draw leading node
     context.fillStyle = 'white'; 
@@ -29,45 +41,15 @@ const player = {
       j++;      
     }
 
-    // draw chips
-    for (let i = 0; i < world.chips.length; i++) {
-      context.fillStyle = 'darkblue'; 
-      context.fillRect(world.chips[i].x, world.chips[i].y, SPACER, SPACER); 
-    }
+    // check collisions and draw new chips
+    player.collisions();
+    chips.draw(); 
+    chips.collisions(); 
 
     // paint context
     context.fill();
 
-    // check collision with chips
-    for (let i = 0; i < world.chips.length; i++) {
-      if (
-        world.chips[i].x == world.player.position.x &&
-        world.chips[i].y == world.player.position.y
-      ) {
-        world.player.maxLength++;
-        world.chips.splice(i, 1); 
-        for (let i = 0; i < 2; i++) {
-          world.chips.push(
-            Vector(
-              10 + SPACER * (Math.floor(Math.random() * Math.floor((world.canvas.width - 10) / SPACER))), 
-              10 + SPACER * (Math.floor(Math.random() * Math.floor((world.canvas.height - 10) / SPACER)))
-            )
-          );
-        }
-      }
-    }
-
-    // check collision with self 
-    for (let i = world.player.body.length - 1; i > 0; i--) {
-      if (
-        world.player.position.x == world.player.body[i].x &&
-        world.player.position.y == world.player.body[i].y
-      ) {
-        world.playing = false; 
-        canvas.style.backgroundColor = 'red'; 
-      }
-    }
-
+    // boundary check
     const nextPositionX = world.player.position.x + (world.player.velocity.x * SPACER);
     const nextPositionY = world.player.position.y + (world.player.velocity.y * SPACER); 
     if (
@@ -93,9 +75,40 @@ const player = {
   }
 }
 
+
+const chips = {
+  collisions: () => {
+    // check collision with chips
+    for (let i = 0; i < world.chips.length; i++) {
+      if (
+        world.chips[i].x == world.player.position.x &&
+        world.chips[i].y == world.player.position.y
+      ) {
+        world.player.maxLength++;
+        world.chips.splice(i, 1); 
+        for (let i = 0; i < 2; i++) {
+          world.chips.push(
+            Vector(
+              10 + SPACER * (Math.floor(Math.random() * Math.floor((world.canvas.width - 10) / SPACER))), 
+              10 + SPACER * (Math.floor(Math.random() * Math.floor((world.canvas.height - 10) / SPACER)))
+            )
+          );
+        }
+      }
+    }
+  },
+  draw: () => {
+    // draw chips
+    for (let i = 0; i < world.chips.length; i++) {
+      context.fillStyle = 'darkblue'; 
+      context.fillRect(world.chips[i].x, world.chips[i].y, SPACER, SPACER); 
+    }
+  }
+}
+
 // game world
 const world = {
-  playing: true, 
+  playing: false, 
   canvas: {
     width: window.innerWidth - 1,
     height: window.innerHeight - 4,
@@ -120,8 +133,10 @@ body.append(canvas);
 // keyboard and mouse events
 const handleKeys = (e) => {
     const KEY = e.key;
+    world.keypressed = true; 
     switch (KEY) {
       case ' ':
+        // spacer to reset
         world.player.position = Vector(10,10);
         world.player.velocity = Vector(0,0);
         world.player.body = []; 
@@ -134,38 +149,56 @@ const handleKeys = (e) => {
         if (world.player.velocity.y != 1) {
           world.player.velocity = Vector(0, -1);
         }
-        world.keypressed = true; 
         break;
       case 'ArrowDown':
         if (world.player.velocity.y != -1) {
           world.player.velocity = Vector(0, 1);
         }
-        world.keypressed = true; 
         break;
       case 'ArrowLeft':
         if (world.player.velocity.x != 1) {
           world.player.velocity = Vector(-1, 0);
         }
-        world.keypressed = true; 
         break;
       case 'ArrowRight':
         if (world.player.velocity.x != -1) {
           world.player.velocity = Vector(1, 0);
         }
-        world.keypressed = true; 
         break;
       default: 
     }
 }
 window.addEventListener('keydown', handleKeys);
 
+const scoreboard = () => {
+  context.font = '30px Comic Sans MS'; 
+  context.fillStyle = 'white';
+  context.textAlign = 'right'; 
+  context.fillText(world.player.maxLength, world.canvas.width - 10, 35); 
+}
+
+const startScreen = () => {
+  if (!world.playing) {
+    context.font = '30px Comic Sans MS'; 
+    context.fillStyle = 'white';
+    context.textAlign = 'center'; 
+    context.fillText('Space to start. Arrow keys to move.', world.canvas.width / 2, world.canvas.height / 2 + 15);  
+  }
+}
+
 // game loop
 const draw = (now) => {
   requestAnimationFrame(draw);
+  
   if (now - TIMESTAMP < 1000 / FPS || !world.playing) return; 
+  
   context.clearRect(0, 0, world.canvas.width, world.canvas.height);
+  scoreboard();
   world.player.draw(world);
+  startScreen();
+  
   TIMESTAMP = now;
 }
 
+startScreen(); 
 draw(); 
