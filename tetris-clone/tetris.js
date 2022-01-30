@@ -17,6 +17,9 @@ const Tetris = () => {
     const context = canvas.getContext('2d'); 
     const fps = 60;
     const scale = 20; 
+    let MAX_HEIGHT = Math.floor(window.innerHeight / scale);
+    let MAX_WIDTH = Math.floor(window.innerHeight / scale);
+
     let playing = true;
     let timestamp = 0;
     let ticker = 0; 
@@ -27,27 +30,31 @@ const Tetris = () => {
     }
 
     const tetrimino = () => {
-      console.log("generating tetrimino"); 
-      const xmino = [
-        [0,0,0,0],
-        [0,1,1,2],
-        [0,1,2,2],
-        [0,0,1,2],
-        [0,0,1,1]
-      ];
-      const ymino = [
-        [0,1,2,3],
-        [0,0,1,0],
-        [0,0,0,1],
-        [1,0,0,0],
-        [1,0,1,0]
-      ];
-      const s = Math.floor(Math.random() * xmino.length); 
+      const xymino = [
+        {
+          x: [0,0,0,0],
+          y: [0,1,2,3]
+        },
+        {
+          x: [0,1,1,2],
+          y: [0,0,1,0],
+        },
+        {
+          x: [0,1,2,2],
+          y: [0,0,0,1],
+        },
+        {
+          x: [0,0,1,2],
+          y: [1,0,0,0],
+        }, 
+      ]
+
+      const s = Math.floor(Math.random() * xymino.length); 
       const t = {
-        x: xmino[s],
-        y: ymino[s]
+        x: xymino[s].x,
+        y: xymino[s].y
       }; 
-      console.log(t);
+
       return t; 
     }
 
@@ -64,24 +71,24 @@ const Tetris = () => {
     
     const handleControls = (e) => {
       switch(e.key) {
-        case "ArrowUp":
-          player.y = player.y - scale;
-          ticker = ticker - scale;
+        case "ArrowUp": 
+          if (player.y > 0) {
+            player.y--;
+          }
           break;
         case "ArrowDown":
-          player.y = player.y + scale;
-          ticker = ticker + scale;
+          player.y++;
           break;
         case "ArrowLeft":
           if (player.x > 0) {
-            player.x = player.x - scale;
+            player.x--;
           }
           break;
         case "ArrowRight":
-          const boundary = player.x + player.t.x[player.t.x.length-1] * scale; 
-          if (boundary < canvas.width - scale * 2) {
-            player.x = player.x + scale;
-          }
+          // const boundary = player.x - 1 - Utils.largest(player.t.x).value; 
+          // if (boundary < MAX_WIDTH + 1) {
+            player.x++;
+          // }
           break;
         case "P":
         case "p":
@@ -93,7 +100,7 @@ const Tetris = () => {
           resetPlayerState();
           context.clearRect(0, 0, canvas.width, canvas.height);
           updatePlayer();  
-          updateHeap();  
+          updateHeap();
           break;
         default:
           break;
@@ -108,23 +115,49 @@ const Tetris = () => {
     }
     
     const checkCollision = () => {
-      const y = player.t.y;
-      const x = player.t.x;
-      const playerHeight = player.t.y[player.t.y.length-1] * scale;
-      const playerOffsetY = playerHeight + player.y;
-      const largestX = Utils.largest(x); 
-      const largestY = Utils.largest(y); 
-      console.log("X: ", largestX.value, y[largestX.index]); 
-      console.log("Y: ", x[largestY.index], largestY.value); 
-      console.log("...");
-      if (playerOffsetY >= canvas.height) {
-        for (let i = 0; i < player.t.x.length; i++) {
-          const playerX = player.t.x[i];
-          const playerY = player.t.x[i];
-          for (let j = 0; j < heap.x.length; j++) {
-            const heapX = heap.x[j];
-            const heapY = heap.y[j];
+      const py = player.t.y; // vertical player coords
+      const px = player.t.x; // horizontal player coords
+      const ph = Utils.largest(py); // max player height
+
+      const hy = heap.y; // vertical heap coords
+      const hx = heap.x; // horizontal heap coords
+      const hh = Utils.largest(hy); // max heap height
+
+      // if max player height + player Y position is GTE max height of world...
+      const bottomCollision = ph.value + player.y >= MAX_HEIGHT;
+      
+      // if max player height + next player Y position is GTE max height of world - max heap height...
+      const rowCollision = ph.value + player.y + 1 >= MAX_HEIGHT - hh.value;
+
+      let collision = bottomCollision;
+
+      // if player has collided with row space
+      // check if any player cells intersect with heap
+      if (rowCollision) {
+        for (let p = 0; p < px.length; p++) {
+          if (collision) {
+            continue;
           }
+
+          const pxx = px[p] + player.x;
+          const pyy = py[p] + player.y + 1;
+          
+          for (let h = 0; h < hx.length; h++) {
+            const hxx = hx[h];
+            const hyy = MAX_HEIGHT - hy[h];
+
+            if (pxx == hxx && pyy == hyy) {
+              collision = true; 
+              continue; 
+            }
+          }
+        }
+      }
+
+      if (collision) {
+        for(var p = 0; p < px.length; p++) {
+          hx.push(player.x + px[p]);
+          hy.push(MAX_HEIGHT - player.y - py[p]);            
         }
         resetPlayerState(); 
       }
@@ -134,25 +167,35 @@ const Tetris = () => {
       for(var i = 0; i < heap.x.length; i++) {
         const x = heap.x[i] * scale;
         const y = scale * (heap.y[i] + 1);
-        pixel('orange', [x, canvas.height - y, scale, scale]);
+        pixel('orange', [x, MAX_HEIGHT * scale - y, scale, scale]);
       }
     }
 
     const updatePlayer = (now) => {
       checkCollision(); 
-
+      const playerPositionX = player.x*scale; 
+      const playerPositionY = player.y*scale; 
+      
       // draw player
-      for(var i = 0; i < player.t.x.length; i++) {
-        const x = player.x + player.t.x[i] * scale;
-        const y = (player.t.y[i] * scale) + ticker;
-        player.y = y;
-        pixel('blue', [x, y, scale, scale]); 
+      for(var i = 0; i < player.t.x.length; i++) {  
+        const blockWidth = player.t.x[i] * scale;
+        const blockHeight = player.t.y[i] * scale; 
+        const x = playerPositionX + blockWidth;
+        const y = playerPositionY + blockHeight;
+        pixel('blue', [x, y, scale, scale]);  
+      }
+
+      if (ticker > 15) {
+        player.y++;
+        ticker = 0; 
       }
     }
 
     const setWindowSize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      MAX_HEIGHT = Math.floor(window.innerHeight / scale);
+      MAX_WIDTH = Math.floor(window.innerHeight / scale);
     }
 
     const paint = (now) => {
@@ -160,7 +203,7 @@ const Tetris = () => {
       if (playing) {
         // if (now - timestamp < 1000 / fps) return; 
         context.clearRect(0, 0, canvas.width, canvas.height);
-        updatePlayer();
+        updatePlayer(now);
         updateHeap();
         ticker += 1;
         // timestamp = now;
