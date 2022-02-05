@@ -10,37 +10,55 @@ const Tetris = () => {
       }
       return max; 
     },
-    rotate: (player) => {
+    rotate: (spin) => {
       const odd = [
-        [[2, 0], [1, 1], [0, 2]],
-        [[1, -1], [0, 0], [-1, 1]],
-        [[0, -2], [-1, -1], [-2, 0]], 
+        [2, 0], [1, 1], [0, 2],
+        [1, -1], [0, 0], [-1, 1],
+        [0, -2], [-1, -1], [-2, 0],
       ];
+
       const even = [
-        [[3, 0], [2, 1], [1, 2], [0, 3]],
-        [[2, -1], [1, 0], [0, 1], [-1, 2]],
-        [[1, -2], [0, -1], [-1, 0], [-2, 1]],
-        [[0, -3], [-1, -2], [-2, -1], [-3, 0]],
+        [3, 0], [2, 1], [1, 2], [0, 3],
+        [2, -1], [1, 0], [0, 1], [-1, 2],
+        [1, -2], [0, -1], [-1, 0], [-2, 1],
+        [0, -3], [-1, -2], [-2, -1], [-3, 0],
       ];
 
       const longest = Math.max(...player.t.x, ...player.t.y);
       const isEven = longest % 2;
+      
       let newX = [];
       let newY = []; 
+
+      let rotation;
+      let rows;
+
+      if (isEven) {
+        rotation = even;
+        rows = 4;
+      } else {
+        rotation = odd;
+        rows = 3;
+      }
 
       for (let m = 0; m < player.t.x.length; m++) {
         const x = player.t.x[m];
         const y = player.t.y[m];
-        let rotation;
+        const coord = y * rows + x;
+        const rx = spin ? rotation[coord][0] : rotation.reverse()[coord][1];
+        const ry = spin ? rotation[coord][1] : rotation.reverse()[coord][0];
+        newX.push(x + rx);
+        newY.push(y + ry);
+      }
+      
+      // check left side boundary overflow
+      if (player.x < 0) {
+        player.x = 0;
+      }
 
-        if (isEven) {
-          rotation = even; 
-        } else {
-          rotation = odd; 
-        }
-
-        newX.push(x + rotation[y][x][0]);
-        newY.push(y + rotation[y][x][1]);
+      // right side boundary overflow
+      if (player.x + Math.max(...newX) >= MAX_WIDTH) {
+        player.x = MAX_WIDTH - Math.max(...player.t.y) - 1;
       }
 
       player.t.x = newX;
@@ -52,7 +70,7 @@ const Tetris = () => {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d'); 
   const fps = 60;
-  const scale = 40; 
+  const scale = 20; 
   let MAX_HEIGHT = Math.floor(window.innerHeight / scale);
   let MAX_WIDTH = Math.floor(window.innerHeight / scale);
 
@@ -61,8 +79,8 @@ const Tetris = () => {
   let ticker = 0; 
 
   const heap = {
-    x: [0, 1, 2, 2],
-    y: [0, 0, 0, 1]
+    x: [],
+    y: []
   }
 
   const tetrimino = () => {
@@ -82,8 +100,20 @@ const Tetris = () => {
       {
         x: [0,0,1,2],
         y: [1,0,0,0],
-      }, 
-    ]
+      },
+      {
+        x: [0,1,1,2],
+        y: [0,0,1,1],
+      },
+      {
+        x: [0,1,1,2],
+        y: [1,1,0,0],
+      },
+      {
+        x: [0,1,0,1],
+        y: [0,0,1,1],
+      },
+    ];
 
     const s = Math.floor(Math.random() * xymino.length); 
     const t = {
@@ -105,27 +135,29 @@ const Tetris = () => {
     context.fillRect(position[0], position[1], position[2], position[3]);
   }
   
-  const handleControls = (e) => {
+  const handleControls = (e) => { 
+    // console.log(player.x, player.y); 
     switch(e.key) {
       case "ArrowUp": 
         if (player.y > 0) {
           player.y--;
         }
-        Utils.rotate(player); 
+        Utils.rotate(e.shiftKey); 
         break;
       case "ArrowDown":
         player.y++;
         break;
-      case "ArrowLeft":
-        if (player.x > 0) {
+      case "ArrowLeft": 
+        if (player.x + Math.min(...player.t.x) > 0) {
           player.x--;
         }
         break;
       case "ArrowRight":
-        // const boundary = player.x - 1 - Utils.largest(player.t.x).value; 
-        // if (boundary < MAX_WIDTH + 1) {
+        const edge = player.x + Utils.largest(player.t.x).value + 1; 
+        console.log(edge, MAX_WIDTH); 
+        if (edge < MAX_WIDTH) {
           player.x++;
-        // }
+        }
         break;
       case "P":
       case "p":
@@ -222,7 +254,7 @@ const Tetris = () => {
       pixel('blue', [x, y, scale, scale]);  
     }
 
-    if (ticker > 15) {
+    if (ticker > fps) {
       player.y++;
       ticker = 0; 
     }
@@ -232,7 +264,7 @@ const Tetris = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     MAX_HEIGHT = Math.floor(window.innerHeight / scale);
-    MAX_WIDTH = Math.floor(window.innerHeight / scale);
+    MAX_WIDTH = Math.floor(window.innerWidth / scale);
   }
 
   const paint = (now) => {
