@@ -1,4 +1,17 @@
 const Tetris = () => {
+
+  const body = document.body; 
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d'); 
+  const fps = 60;
+  const scale = 30; 
+  let MAX_HEIGHT = Math.floor(window.innerHeight / scale);
+  let MAX_WIDTH = Math.floor(window.innerHeight / scale);
+
+  let playing = true;
+  let timestamp = 0;
+  let ticker = 0; 
+
   const Utils = {
     largest: (array) => {
       let max = { index: 0, value: array[0] };
@@ -65,18 +78,6 @@ const Tetris = () => {
       player.t.y = newY;
     }
   }
-
-  const body = document.body; 
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d'); 
-  const fps = 60;
-  const scale = 20; 
-  let MAX_HEIGHT = Math.floor(window.innerHeight / scale);
-  let MAX_WIDTH = Math.floor(window.innerHeight / scale);
-
-  let playing = true;
-  let timestamp = 0;
-  let ticker = 0; 
 
   const heap = {
     x: [],
@@ -154,7 +155,7 @@ const Tetris = () => {
         break;
       case "ArrowRight":
         const edge = player.x + Utils.largest(player.t.x).value + 1; 
-        console.log(edge, MAX_WIDTH); 
+        // console.log(edge, MAX_WIDTH); 
         if (edge < MAX_WIDTH) {
           player.x++;
         }
@@ -167,6 +168,7 @@ const Tetris = () => {
       case "R":
       case "r":
         resetPlayerState();
+        resetHeap(); 
         context.clearRect(0, 0, canvas.width, canvas.height);
         updatePlayer();  
         updateHeap();
@@ -174,13 +176,19 @@ const Tetris = () => {
       default:
         break;
       }
-    }
+  }
       
   const resetPlayerState = () => {
     player.y = 0;
-    player.x = 0;
+    // player.x = Math.floor(Math.random() + MAX_WIDTH);
     player.t = tetrimino(); 
+    player.x = Math.max(0, Math.floor(Math.random() * MAX_WIDTH - 2));
     ticker = 0;
+  }
+
+  const resetHeap = () => {
+    heap.x = [];
+    heap.y = [];
   }
   
   const checkCollision = () => {
@@ -232,12 +240,46 @@ const Tetris = () => {
     }
   }
 
+  const checkHeap = () => {
+    const groupByY = [];
+    const rowsToRemove = []; 
+    for (let h = 0; h < heap.x.length; h++) {
+      const x = heap.x[h];
+      const y = heap.y[h];
+      typeof groupByY[y] === "undefined" ? groupByY[y] = [] : null;
+      groupByY[y].push({ x: x, y: y, index: h });
+    }
+    for (let y = 0; y < groupByY.length; y++) {
+      const groupY = groupByY[y];
+      if (groupY.length == MAX_WIDTH) {
+        rowsToRemove.push(y);
+      }
+    }
+    return rowsToRemove; 
+  }
+
   const updateHeap = () => {
+    const rowsToRemove = checkHeap();
+    // rowsToRemove.map(row => {
+      // delete heap.x[row]; 
+      // delete heap.y[row];
+      // console.log(row);
+    // });
+    let shift = 0;
     for(var i = 0; i < heap.x.length; i++) {
       const x = heap.x[i] * scale;
       const y = scale * (heap.y[i] + 1);
-      pixel('orange', [x, MAX_HEIGHT * scale - y, scale, scale]);
-    }
+      if (rowsToRemove.includes(heap.y[i])) {
+        pixel('green', [x, MAX_HEIGHT * scale - y, scale, scale]);
+        // delete heap.x[i];
+        // delete heap.y[i];
+        // console.log(heap.x[i], heap.y[i]);
+        shift++;
+      } else {
+        pixel('orange', [x, MAX_HEIGHT * scale - y, scale, scale]);
+      }
+      console.log('shift: ', shift);
+    } 
   }
 
   const updatePlayer = (now) => {
@@ -263,8 +305,8 @@ const Tetris = () => {
   const setWindowSize = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    MAX_HEIGHT = Math.floor(window.innerHeight / scale);
-    MAX_WIDTH = Math.floor(window.innerWidth / scale);
+    MAX_HEIGHT = Math.floor(window.innerHeight / scale) + 1;
+    MAX_WIDTH = Math.floor(window.innerWidth / scale) + 1;
   }
 
   const paint = (now) => {
@@ -272,6 +314,8 @@ const Tetris = () => {
     if (playing) {
       // if (now - timestamp < 1000 / fps) return; 
       context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "darkblue"; 
+      context.fillRect(0, 0, canvas.width, canvas.height);
       updatePlayer(now);
       updateHeap();
       ticker += 1;
